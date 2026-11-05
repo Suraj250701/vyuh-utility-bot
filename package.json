@@ -1,0 +1,16 @@
+{
+  "name": "vyuh-esports-unified-discord-bot",
+  "version": "1.0.0",
+  "description": "Unified Vyuh Esports welcome and ticket bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/register-commands.js"
+  },
+  "engines": { "node": ">=20.11.0" },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "discord.js": "^14.25.1",
+    "dotenv": "^16.6.1"
+  }
+}
