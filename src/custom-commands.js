@@ -77,7 +77,8 @@ for (const [column, definition] of [
   ["winners_role_id", "TEXT"],
   ["required_role_config", "TEXT NOT NULL DEFAULT 'all'"],
   ["bonus_roles", "TEXT NOT NULL DEFAULT '{}'"],
-  ["messages_required", "INTEGER NOT NULL DEFAULT 0"]
+  ["messages_required", "INTEGER NOT NULL DEFAULT 0"],
+  ["result_message_id", "TEXT"]
 ]) {
   if (!giveawayColumns.includes(column)) db.exec(`ALTER TABLE giveaways ADD COLUMN ${column} ${definition}`);
 }
@@ -501,8 +502,14 @@ async function handleCustomCommand(interaction) {
         return reply(interaction,{content: rows.length ? rows.map(g=>`**#${g.id} — ${g.prize}** in <#${g.channel_id}> • ends <t:${Math.floor(g.ends_at/1000)}:R> • <#${g.channel_id}>`).join("\n") : "There are no active giveaways."});
       }
       const id = interaction.options.getInteger("id");
-      const g = getGiveaway(id);
+      let g = getGiveaway(id);
       if (!g) return reply(interaction,{content:`Giveaway #${id} was not found in this server.`});
+      // If the scheduled end time has passed but the 30-second expiry worker has
+      // not processed it yet, process it before evaluating a reroll request.
+      if (sub === "reroll" && g.status === "active" && g.ends_at <= Date.now()) {
+        await processExpiredGiveaways(interaction.client);
+        g = getGiveaway(id);
+      }
       if (sub === "delete") {
         const ch = await interaction.guild.channels.fetch(g.channel_id).catch(()=>null);
         if (ch && g.message_id) await ch.messages.delete(g.message_id).catch(()=>{});
@@ -510,18 +517,44 @@ async function handleCustomCommand(interaction) {
         return reply(interaction,{content:`Giveaway #${id} deleted.`});
       }
       const participants = JSON.parse(g.participants || "[]");
-      const winners = pickWinners(participants, g.winners);
       if (sub === "end" && g.status !== "active") return reply(interaction,{content:"This giveaway is already ended."});
-      if (sub === "end" || sub === "reroll") {
-        if (!winners.length && sub === "reroll") return reply(interaction,{content:"No eligible entries are recorded for this giveaway."});
-        if (sub === "end") db.prepare("UPDATE giveaways SET status='ended', winners_json=? WHERE id=?").run(JSON.stringify(winners),id);
-        else db.prepare("UPDATE giveaways SET winners_json=? WHERE id=?").run(JSON.stringify(winners),id);
-        if (sub === "end") {
-          await publishGiveawayResults(interaction.client, g, winners);
-        } else {
-          const ch = await interaction.guild.channels.fetch(g.channel_id).catch(()=>null);
-          if (ch?.isTextBased()) await ch.send(`🎉 **Giveaway rerolled — ${g.prize}**\nWinner(s): ${winners.map(uid=>`<@${uid}>`).join(", ")}`).catch(()=>{});
+      if (sub === "reroll") {
+        if (g.status !== "ended") {
+          return reply(interaction,{content: g.status === "active"
+            ? `Giveaway #${id} is still active. It ends <t:${Math.floor(g.ends_at / 1000)}:R>. Reroll is available only after the original results are published.`
+            : "This giveaway is not eligible for reroll."});
         }
+        if (!g.result_message_id) {
+          return reply(interaction,{content:"The original giveaway results have not been published successfully yet. Reroll is unavailable."});
+        }
+        const resultChannel = await interaction.client.channels.fetch(g.channel_id).catch(() => null);
+        const originalResult = resultChannel?.isTextBased()
+          ? await resultChannel.messages.fetch(g.result_message_id).catch(() => null)
+          : null;
+        if (!originalResult) {
+          return reply(interaction,{content:"The original giveaway result message could not be found. Reroll is unavailable until the result is restored."});
+        }
+        const previousWinners = new Set(JSON.parse(g.winners_json || "[]"));
+        const eligibleForReroll = [...new Set(participants)].filter(uid => !previousWinners.has(uid));
+        const rerollWinners = pickWinners(eligibleForReroll, g.winners);
+        if (!rerollWinners.length) {
+          return reply(interaction,{content:"There are no remaining eligible participants to select as new winners."});
+        }
+        const rerollMessage = await resultChannel.send(
+          `🎉 **Giveaway rerolled — ${g.prize}**\\nWinner(s): ${rerollWinners.map(uid=>`<@${uid}>`).join(", ")}`
+        ).catch(error => {
+          console.error("Could not publish giveaway reroll:", error.message);
+          return null;
+        });
+        if (!rerollMessage) return reply(interaction,{content:"Could not publish the reroll result. No winner changes were saved."});
+        db.prepare("UPDATE giveaways SET winners_json=? WHERE id=?").run(JSON.stringify([...previousWinners, ...rerollWinners]),id);
+        return reply(interaction,{content:`Rerolled winner(s): ${rerollWinners.map(uid=>`<@${uid}>`).join(", ")}`});
+      }
+      if (sub === "end") {
+        const winners = pickWinners(participants, g.winners);
+        db.prepare("UPDATE giveaways SET status='ended', winners_json=? WHERE id=?").run(JSON.stringify(winners),id);
+        const resultMessage = await publishGiveawayResults(interaction.client, g, winners);
+        if (resultMessage?.id) db.prepare("UPDATE giveaways SET result_message_id=? WHERE id=?").run(resultMessage.id,id);
         return reply(interaction,{content:`Winner(s): ${winners.map(uid=>`<@${uid}>`).join(", ")}`});
       }
       return false;
@@ -668,7 +701,10 @@ async function processExpiredGiveaways(client) {
         if (member) await member.roles.add(g.winners_role_id, `Winner of giveaway #${g.id}`).catch(() => {});
       }
     }
-    await publishGiveawayResults(client, g, winners);
+    const resultMessage = await publishGiveawayResults(client, g, winners);
+    if (resultMessage?.id) {
+      db.prepare("UPDATE giveaways SET result_message_id=? WHERE id=?").run(resultMessage.id, g.id);
+    }
   }
 }
 
@@ -723,9 +759,28 @@ async function handleGiveawayButton(interaction) {
     }
   }
 
-  // Entries may contain repeated IDs for bonus entries, so test unique participation.
-  if (entries.includes(interaction.user.id)) {
-    return interaction.editReply({ content: "You are already entered in this giveaway." });
+  // Clicking Entry toggles participation. Remove every occurrence so bonus
+  // entries are withdrawn together with the user's base entry.
+  const alreadyEntered = entries.includes(interaction.user.id);
+  if (alreadyEntered) {
+    const updatedEntries = entries.filter(userId => userId !== interaction.user.id);
+    db.prepare("UPDATE giveaways SET participants=? WHERE id=?").run(JSON.stringify(updatedEntries), id);
+    const participantCount = new Set(updatedEntries).size;
+    const sourceEmbed = interaction.message?.embeds?.[0];
+    if (sourceEmbed) {
+      const updatedEmbed = EmbedBuilder.from(sourceEmbed.toJSON());
+      const currentDescription = sourceEmbed.description || "";
+      updatedEmbed.setDescription(currentDescription.replace(
+        /\\*\\*Participants:\\*\\* \\d+/,
+        `**Participants:** ${participantCount}`
+      ));
+      await interaction.message.edit({ embeds: [updatedEmbed] }).catch(error => {
+        console.error("Could not update giveaway participant count:", error.message);
+      });
+    }
+    return interaction.editReply({
+      content: `You have left giveaway #${id}: **${g.prize}**. Participants: ${participantCount}. Click Entry again if you want to re-enter.`
+    });
   }
 
   const bonus = JSON.parse(g.bonus_roles || "{}");
