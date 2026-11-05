@@ -226,10 +226,18 @@ async function registerUnifiedCommands() {
 function roleForCategory(guild, category) {
   if (!guild || !category || !category.roleEnv) return null;
 
-  const configuredId = process.env[category.roleEnv];
-  const roleId = configuredId || SUPPORT_ROLE_ID;
+  const configuredId = (process.env[category.roleEnv] || "").trim();
+  const fallbackId = (SUPPORT_ROLE_ID || "").trim();
 
-  return roleId ? guild.roles.cache.get(roleId) || null : null;
+  if (configuredId && guild.roles.cache.has(configuredId)) {
+    return guild.roles.cache.get(configuredId);
+  }
+
+  if (configuredId) {
+    console.warn(`[Tickets] Category role ${category.roleEnv} is set but does not match a role in this server; using fallback if available.`);
+  }
+
+  return fallbackId ? guild.roles.cache.get(fallbackId) || null : null;
 }
 
 function categoryByKey(key) {
@@ -989,11 +997,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         `).run(existing.id);
       }
 
-      const staffRole = roleForCategory(interaction.guild, selected);
-
       await interaction.deferReply({
         flags: MessageFlags.Ephemeral
       });
+
+      // Load the server's roles before building permission overwrites.
+      // Optional category-role variables may be blank or may contain an
+      // outdated role ID; neither case should prevent ticket creation.
+      await interaction.guild.roles.fetch();
+
+      const staffRole = roleForCategory(interaction.guild, selected);
 
       const nextId = db.prepare(
         "SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM tickets"
@@ -1002,11 +1015,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const channelName =
         safeChannelPart(interaction.user.username) || `ticket-${nextId}`;
 
-      const staffRoleIds = new Set([
+      const configuredStaffRoleIds = [
         ...(staffRole ? [staffRole.id] : []),
         ...configuredTicketControlRoleIds(),
         ...(SUPPORT_ROLE_ID ? [SUPPORT_ROLE_ID] : [])
-      ]);
+      ];
+
+      // Discord.js requires role overwrite IDs to resolve to cached guild
+      // roles. Ignore blank, deleted, or invalid optional role IDs.
+      const staffRoleIds = new Set(
+        configuredStaffRoleIds.filter(roleId => {
+          const valid = interaction.guild.roles.cache.has(roleId);
+          if (!valid) {
+            console.warn(`[Tickets] Ignoring unknown/unavailable staff role ID: ${roleId}`);
+          }
+          return valid;
+        })
+      );
 
       const staffAllow = [
         PermissionFlagsBits.ViewChannel,
