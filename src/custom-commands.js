@@ -214,10 +214,31 @@ async function publishGiveawayResults(client, giveaway, winners) {
   const channel = await client.channels.fetch(giveaway.channel_id).catch(() => null);
   if (!channel?.isTextBased()) return null;
   const participantCount = new Set(JSON.parse(giveaway.participants || "[]")).size;
-  const winnerText = winners.length
-    ? `🏆 Winner${winners.length === 1 ? "" : "s"}: ${winners.map(id => `<@${id}>`).join(", ")}`
-    : "No eligible entries were recorded.";
-  const resultMessage = await channel.send({ content: `\n🎉 **${giveaway.prize} — Giveaway Results**\n\n${winnerText}` }).catch(error => {
+
+  const winnerMentions = winners.map(id => `<@${id}>`).join(", ");
+  const resultContent = winners.length
+    ? [
+        `🎉 **${giveaway.prize} Giveaway Results** 🎉`,
+        "",
+        `Congratulations to ${winnerMentions} on winning the **${giveaway.prize}**!`,
+        "",
+        "Thank you to everyone who participated and supported the giveaway. We appreciate your involvement.",
+        "",
+        "<@556500000105037854>, please open a ticket in <#1512486077083025630> to claim your reward.",
+        "",
+        "**— Team Vyuh Esports**"
+      ].join("\n")
+    : [
+        `🎉 **${giveaway.prize} Giveaway Results** 🎉`,
+        "",
+        "No eligible entries were recorded.",
+        "",
+        "Thank you to everyone who participated and supported the giveaway.",
+        "",
+        "**— Team Vyuh Esports**"
+      ].join("\n");
+
+  const resultMessage = await channel.send({ content: resultContent }).catch(error => {
     console.error("Could not publish giveaway results:", error.message);
     return null;
   });
@@ -477,7 +498,7 @@ async function handleCustomCommand(interaction) {
       if (sub === "templates") return reply(interaction,{content:"**Create:** `/giveaway create prize:Prize duration:24h winners:1 channel:#giveaways`\n**End:** `/giveaway end id:1`\n**Reroll:** `/giveaway reroll id:1`\n**List:** `/giveaway list`"});
       if (sub === "list" || sub === "scheduled") {
         const rows = db.prepare("SELECT * FROM giveaways WHERE guild_id=? AND status='active' ORDER BY ends_at ASC LIMIT 20").all(guildId);
-        return reply(interaction,{content: rows.length ? rows.map(g=>`**#${g.id} — ${g.prize}** in <#${g.channel_id}> • ends <t:${Math.floor(g.ends_at/1000)}:R> • <#${g.channel_id}>`).join("\\n") : "There are no active giveaways."});
+        return reply(interaction,{content: rows.length ? rows.map(g=>`**#${g.id} — ${g.prize}** in <#${g.channel_id}> • ends <t:${Math.floor(g.ends_at/1000)}:R> • <#${g.channel_id}>`).join("\n") : "There are no active giveaways."});
       }
       const id = interaction.options.getInteger("id");
       const g = getGiveaway(id);
