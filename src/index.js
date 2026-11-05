@@ -224,20 +224,40 @@ async function registerUnifiedCommands() {
 }
 
 function roleForCategory(guild, category) {
-  if (!guild || !category || !category.roleEnv) return null;
+  if (!guild || !category) return null;
 
-  const configuredId = (process.env[category.roleEnv] || "").trim();
+  // Check the category's primary role variable and any explicitly configured
+  // aliases. This supports existing deployments using older variable names.
+  const roleEnvNames = [
+    category.roleEnv,
+    ...(category.roleEnvAliases || [])
+  ].filter(Boolean);
+
+  for (const envName of roleEnvNames) {
+    const roleId = (process.env[envName] || "").trim();
+    if (!roleId) continue;
+
+    const role = guild.roles.cache.get(roleId);
+    if (role) return role;
+
+    console.warn(
+      `[Tickets] ${envName} is set, but its role ID was not found in this server.`
+    );
+  }
+
+  // Category-specific roles are optional; use the general support role
+  // when no valid category-specific role is configured.
   const fallbackId = (SUPPORT_ROLE_ID || "").trim();
+  if (fallbackId) {
+    const fallbackRole = guild.roles.cache.get(fallbackId);
+    if (fallbackRole) return fallbackRole;
 
-  if (configuredId && guild.roles.cache.has(configuredId)) {
-    return guild.roles.cache.get(configuredId);
+    console.warn(
+      "[Tickets] SUPPORT_ROLE_ID is set, but its role ID was not found in this server."
+    );
   }
 
-  if (configuredId) {
-    console.warn(`[Tickets] Category role ${category.roleEnv} is set but does not match a role in this server; using fallback if available.`);
-  }
-
-  return fallbackId ? guild.roles.cache.get(fallbackId) || null : null;
+  return null;
 }
 
 function categoryByKey(key) {

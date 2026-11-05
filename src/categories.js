@@ -63,6 +63,7 @@ const categories = [
     emoji: "🛠️",
     description: "Apply to join the Vyuh Esports staff team.",
     roleEnv: "STAFF_APPLICATION_ROLE_ID",
+    roleEnvAliases: ["ESPORTS_STAFF_ROLE_ID"],
     questions: [
       "What role are you applying for?",
       "What experience do you have?",
