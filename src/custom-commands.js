@@ -771,7 +771,7 @@ async function handleGiveawayButton(interaction) {
       const updatedEmbed = EmbedBuilder.from(sourceEmbed.toJSON());
       const currentDescription = sourceEmbed.description || "";
       updatedEmbed.setDescription(currentDescription.replace(
-        /\\*\\*Participants:\\*\\* \\d+/,
+        /\*\*Participants:\*\* \d+/,
         `**Participants:** ${participantCount}`
       ));
       await interaction.message.edit({ embeds: [updatedEmbed] }).catch(error => {
