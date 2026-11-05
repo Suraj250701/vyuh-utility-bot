@@ -226,8 +226,8 @@ async function publishGiveawayResults(client, giveaway, winners) {
     if (original) {
       const endedAt = Math.floor(Date.now() / 1000);
       const statusLine = resultMessage?.url
-        ? `⏰ This giveaway has now ended; the list of winners can be found [here](${resultMessage.url}).`
-        : "⏰ This giveaway has now ended.";
+        ? `This giveaway has now ended; the list of winners can be found [here](${resultMessage.url}).`
+        : "This giveaway has now ended.";
       const description = [
         `• Hosted by <@${giveaway.host_id}>`,
         `• Ended at: <t:${endedAt}:f> (<t:${endedAt}:R>)`,
