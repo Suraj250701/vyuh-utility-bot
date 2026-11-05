@@ -217,7 +217,7 @@ async function publishGiveawayResults(client, giveaway, winners) {
   const winnerText = winners.length
     ? `🏆 Winner${winners.length === 1 ? "" : "s"}: ${winners.map(id => `<@${id}>`).join(", ")}`
     : "No eligible entries were recorded.";
-  const resultMessage = await channel.send({ content: `🎉 **${giveaway.prize} — Giveaway Results**\n${winnerText}` }).catch(error => {
+  const resultMessage = await channel.send({ content: `🎉 **${giveaway.prize} — Giveaway Results**\n\n${winnerText}` }).catch(error => {
     console.error("Could not publish giveaway results:", error.message);
     return null;
   });
