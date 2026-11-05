@@ -218,7 +218,7 @@ async function publishGiveawayResults(client, giveaway, winners) {
   const winnerMentions = winners.map(id => `<@${id}>`).join(", ");
   const resultContent = winners.length
     ? [
-        `🎉 **${giveaway.prize} Giveaway Results** 🎉`,
+        `🎉 **Giveaway Results** 🎉`,
         "",
         `Congratulations to ${winnerMentions} on winning the **${giveaway.prize}**!`,
         "",
