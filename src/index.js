@@ -991,14 +991,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const staffRole = roleForCategory(interaction.guild, selected);
 
-      if (!staffRole) {
-        return interaction.reply({
-          content:
-            `The staff role for **${selected.label}** is not configured correctly. Ask an administrator to check the bot settings.`,
-          flags: MessageFlags.Ephemeral
-        });
-      }
-
       await interaction.deferReply({
         flags: MessageFlags.Ephemeral
       });
@@ -1011,7 +1003,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         safeChannelPart(interaction.user.username) || `ticket-${nextId}`;
 
       const staffRoleIds = new Set([
-        staffRole.id,
+        ...(staffRole ? [staffRole.id] : []),
         ...configuredTicketControlRoleIds(),
         ...(SUPPORT_ROLE_ID ? [SUPPORT_ROLE_ID] : [])
       ]);
@@ -1104,7 +1096,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           },
           {
             name: "Assigned Team",
-            value: `<@&${staffRole.id}>`,
+            value: staffRole ? `<@&${staffRole.id}>` : "Unassigned",
             inline: true
           }
         )
@@ -1116,7 +1108,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       ).get(ticketId);
 
       await ticketChannel.send({
-        content: `<@${interaction.user.id}> <@&${staffRole.id}>`,
+        content: `<@${interaction.user.id}>${staffRole ? ` <@&${staffRole.id}>` : ""}`,
         embeds: [embed],
         components: staffTicketControls(createdTicket)
       });
