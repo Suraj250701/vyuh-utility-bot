@@ -37,6 +37,8 @@ const {
   TICKET_CATEGORY_ID
 } = process.env;
 
+console.log("DISCORD_TOKEN loaded:", Boolean(DISCORD_TOKEN));
+
 const BRAND_NAME = process.env.BRAND_NAME || "VYUH ESPORTS";
 const PANEL_COLOR = parseInt(process.env.PANEL_COLOR || "F5C842", 16);
 const TICKET_COLOR = parseInt(process.env.TICKET_COLOR || "2F3136", 16);
