@@ -466,7 +466,7 @@ async function handleCustomCommand(interaction) {
         const result = db.prepare("INSERT INTO giveaways (guild_id,channel_id,prize,winners,ends_at,host_id,required_role_id,winners_role_id,required_role_config,bonus_roles,messages_required) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
           .run(guildId, channel.id, prize, interaction.options.getInteger("winners"), endsAt, interaction.user.id, requiredRole?.id || null, winnersRole?.id || null, interaction.options.getString("roles_required_config") || "all", JSON.stringify(parseBonusRoles(interaction.options.getString("roles_bonus_entries"))), messagesRequired);
         const id = Number(result.lastInsertRowid);
-        const gEmbed = embed().setTitle("🎉 GIVEAWAY")
+        const gEmbed = embed().setTitle("🎉 GIVEAWAY 🎉")
           .setDescription(`**Prize:** ${prize}\n**Winners:** ${interaction.options.getInteger("winners")}\n**Participants:** 0\n**Hosted by:** <@${interaction.user.id}>\n**Ends:** <t:${Math.floor(endsAt/1000)}:R>\n**Giveaway ID:** ${id}${requiredRole ? `\n**Required role:** <@&${requiredRole.id}>` : ""}`)
           .setFooter({text:"Click Enter Giveaway to participate."});
         const giveawayButtons = [
