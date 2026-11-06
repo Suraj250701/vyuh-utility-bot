@@ -219,13 +219,13 @@ async function publishGiveawayResults(client, giveaway, winners) {
   const winnerMentions = winners.map(id => `<@${id}>`).join(", ");
   const resultContent = winners.length
     ? [
-        `🎉 **Giveaway Results** 🎉`,
+        `\n🎉 **Giveaway Results** 🎉`,
         "",
         `Congratulations to ${winnerMentions} on winning the **${giveaway.prize}**!`,
         "",
         "Thank you to everyone who participated and supported the giveaway. We appreciate your involvement.",
         "",
-        `${winnerMentions}, please open a ticket in <#1512486077083025630> to claim your reward.`,
+        winnerMentions + ", please open a ticket in <#1512486077083025630> to claim your reward.",
         "",
         "**— Team Vyuh Esports**"
       ].join("\n")
