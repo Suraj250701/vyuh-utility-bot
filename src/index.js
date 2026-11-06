@@ -75,7 +75,7 @@ function buildWelcomeEmbed() {
 
   for (let i = 0; i < (welcomeConfig.sections || []).length; i++) {
     const section = welcomeConfig.sections[i];
-    description += `**${section.heading}**\n${section.items.map(item => `› ${item}`).join("\n")}`;
+    description += `**${section.heading}**\n${section.items.map(item => `${item}`).join("\n")}`;
 
     if (i < welcomeConfig.sections.length - 1) {
       description += "\n\n";
