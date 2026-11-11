@@ -1096,7 +1096,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const channelOptions = {
         name: channelName,
         type: ChannelType.GuildText,
-        topic: `Ticket #${nextId} | ${selected.label} | Owner: ${interaction.user.id}`,
+        topic: `Ticket #${nextId} | ${selected.label} | Owner: ${interaction.user.tag}`,
         permissionOverwrites: overwrites,
         reason: `Ticket created by ${interaction.user.tag} (${selected.label})`
       };
