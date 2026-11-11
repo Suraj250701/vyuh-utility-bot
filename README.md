@@ -76,3 +76,5 @@ Discord's slash-command text field does not provide the same mention autocomplet
 as the regular message composer. Insert a copied mention token or use the IDs in
 the formats above. After installing this update, run `npm run register` once to
 update the slash-command description.
+
+Railway deployment setup
